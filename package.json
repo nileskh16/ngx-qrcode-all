@@ -1,0 +1,23 @@
+{
+    "name": "qrcodebase",
+    "author": "nileskh2504",
+    "scripts": {
+        "transpile": "tsc",
+        "package": "rollup -c",
+        "minify": "uglifyjs dist/bundles/ngx-qrcode-all.umd.js --screw-ie8 --compress --mangle --comments --output dist/bundles/ngx-qrcode-all.umd.min.js",
+        "build": "rm -rf dist && npm run transpile && npm run package && npm run minify"
+    },
+    "devDependencies": {
+        "@angular/common": "^6.1.7",
+        "@angular/compiler": "^6.1.7",
+        "@angular/compiler-cli": "^6.1.7",
+        "@angular/core": "^6.1.7",
+        "rollup": "^0.65.2",
+        "rxjs": "^6.3.2",
+        "typescript": "^3.0.3",
+        "uglify-js": "^3.4.9"
+    },
+    "dependencies": {
+        "qrcode": "^1.2.2"
+    }
+}
