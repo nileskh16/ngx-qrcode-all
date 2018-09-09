@@ -6,6 +6,7 @@ export default {
     moduleName: "ng.nqx-qrcode-all",
     globals: {
         "@angular/core": "ng.core",
+        "@angular/common": "ng.common",
         "rxjs/Observable": "Rx",
         "rxjs/ReplaySubject": "Rx",
         "rxjs/add/operator/map": "Rx.Observable.prototype",
