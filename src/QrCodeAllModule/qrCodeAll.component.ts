@@ -1,5 +1,5 @@
 import { Component, OnInit, OnChanges, ViewChild, Input, ElementRef, Renderer2 } from '@angular/core';
-
+declare var require: any;
 const QrCode = require('qrcode');
 
 @Component({
@@ -88,7 +88,7 @@ export class QrCodeAllComponent implements OnInit, OnChanges {
 
     toImgUrlQr() {
         return new Promise((resolve, reject) => {
-            QrCode.toDataUrl(this.qrCodeValue, {
+            QrCode.toDataURL(this.qrCodeValue, {
                 version: this.qrCodeVersion,
                 errorCorrectionLevel: this.qrCodeECLevel,
                 width: this.width,
