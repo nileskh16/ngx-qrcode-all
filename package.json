@@ -5,7 +5,7 @@
         "transpile": "tsc",
         "package": "rollup -c",
         "minify": "uglifyjs dist/bundles/ngx-qrcode-all.umd.js --screw-ie8 --compress --mangle --comments --output dist/bundles/ngx-qrcode-all.umd.min.js",
-        "build": "rm -rf dist && npm run transpile && npm run package && npm run minify"
+        "build": "npm run transpile && npm run package && npm run minify"
     },
     "devDependencies": {
         "@angular/common": "^6.1.7",
