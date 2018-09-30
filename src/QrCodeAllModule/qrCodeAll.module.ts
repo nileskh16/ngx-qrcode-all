@@ -1,10 +1,14 @@
 import { NgModule, ModuleWithProviders } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { QrCodeAllComponent } from './qrCodeAll.component';
+import { QrCodeScanComponent } from './qrCodeScan.component';
+import { QrCodeCreateComponent } from './qrCodeCreate.component';
 
 @NgModule({
     declarations: [
-        QrCodeAllComponent
+        QrCodeAllComponent,
+        QrCodeScanComponent,
+        QrCodeCreateComponent
     ],
     imports: [
         CommonModule
