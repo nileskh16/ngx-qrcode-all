@@ -3,8 +3,8 @@ import {
     Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output,
     ViewChild, Renderer2
 } from '@angular/core';
-import { Subject } from 'rxjs/Subject';
-import { Subscription } from 'rxjs/Subscription';
+import { Subject } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { QRCode } from '../lib/qr-decoder/qrcode';
 
 @Component({
@@ -18,7 +18,7 @@ import { QRCode } from '../lib/qr-decoder/qrcode';
         <ng-container [ngSwitch]="isCanvasSupported">
             <ng-container *ngSwitchDefault>
                 <canvas #qrCanvas [hidden]="canvasHidden" [width]="canvasWidth" [height]="canvasHeight"></canvas>
-                <div #videoWrapper [style.width]="canvasWidth" [style.height]="canvasHeight"></div>
+                <div #videoWrapper [ngStyle]="videoDivStyle"></div>
             </ng-container>
             <ng-container *ngSwitchCase="false">
                 <p>
@@ -50,6 +50,10 @@ export class QrCodeScanComponent implements OnInit, OnDestroy, AfterViewInit {
     public qrCode: QRCode;
     public stream: MediaStream | null;
     public captureTimeout: any;
+    public videoDivStyle = {
+        'width': '0px',
+        'height': '0px'
+    };
     private canvasHidden = true;
     get isCanvasSupported(): boolean {
         const canvas = this.renderer.createElement('canvas');
@@ -60,6 +64,10 @@ export class QrCodeScanComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     ngOnInit() {
+        this.videoDivStyle = {
+            'width': `${this.canvasWidth}px`,
+            'height': `${this.canvasHeight}px`
+        }
     }
 
     ngOnDestroy() {
