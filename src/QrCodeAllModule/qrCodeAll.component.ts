@@ -3,7 +3,6 @@ import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 @Component({
     selector: 'qr-code-all',
     template: `
-    <h1>Scan or Create QR Codes in your applications</h1>
     <ng-container [ngSwitch]="scanQrCode">
     <ng-container *ngSwitchDefault>
         <app-qrcode-create [qrCodeType]="qrCodeType"

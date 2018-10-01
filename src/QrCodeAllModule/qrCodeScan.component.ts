@@ -1,158 +1,172 @@
-import { Component,
-    OnInit,
+import {
     AfterViewInit,
-    OnDestroy,
-    Input,
-    Output,
-    ElementRef,
-    ViewChild,
-    Renderer2, 
-    EventEmitter
+    Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output,
+    ViewChild, Renderer2
 } from '@angular/core';
+import { Subject } from 'rxjs/Subject';
+import { Subscription } from 'rxjs/Subscription';
 import { QRCode } from '../lib/qr-decoder/qrcode';
 
 @Component({
     selector: 'app-qrcode-scan',
+    styles: [
+        ':host video {height: auto; width: 100%;}',
+        ':host .mirrored { transform: rotateY(180deg); -webkit-transform:rotateY(180deg); -moz-transform:rotateY(180deg); }',
+        ':host {}'
+    ],
     template: `
         <ng-container [ngSwitch]="isCanvasSupported">
             <ng-container *ngSwitchDefault>
-                <canvas #qrCodeCanvas [hidden]="hideCanvas" [width]="canvasWidth" [height]="canvasHeight"></canvas>
+                <canvas #qrCanvas [hidden]="canvasHidden" [width]="canvasWidth" [height]="canvasHeight"></canvas>
                 <div #videoWrapper [style.width]="canvasWidth" [style.height]="canvasHeight"></div>
             </ng-container>
             <ng-container *ngSwitchCase="false">
-                <p>You are using an <strong>outdated</strong> browser</p>
+                <p>
+                    You are using an <strong>outdated</strong> browser.
+                </p>
             </ng-container>
-        </ng-container>
-    `,
-    styles: [
-        ':host video {height: auto, width: 100%}',
-        ':host {}'
-    ]
+        </ng-container>`
 })
 export class QrCodeScanComponent implements OnInit, OnDestroy, AfterViewInit {
 
-    get isCanvasSupported(): boolean {
-        const tempCanvas:HTMLCanvasElement = this.renderer.createElement('canvas');
-        return !!(tempCanvas && tempCanvas.getContext && tempCanvas.getContext('2d'));
-    }
+    @Input() canvasWidth = 640;
+    @Input() canvasHeight = 480;
+    @Input() debug = false;
+    @Input() stopAfterScan = true;
+    @Input() updateTime = 500;
 
-    set isCanvasSupported(value: boolean) {
-        this.isCanvasSupported = value;
-    }
-    @Input('canvasWidth') canvasWidth: number = 640;
-    @Input('canvasHeight') canvasHeight: number = 480;
-    @Input('debug') debug: boolean = false;
-    @Input('stopAfterScan') stopAfterScan: boolean = true;
-    @Input('updateTime') updateTime: number = 500;
+    @Output() onCapture: EventEmitter<string> = new EventEmitter();
+    @Output() foundCameras: EventEmitter<MediaDeviceInfo[]> = new EventEmitter();
 
-    @Output('onCapture') onCapture = new EventEmitter();
+    @ViewChild('videoWrapper') videoWrapper: ElementRef;
+    @ViewChild('qrCanvas') qrCanvas: ElementRef;
 
-    @ViewChild('qrCodeCanvas') canvasRef: ElementRef;
-    @ViewChild('videoWrapper') videoRef: ElementRef;
-    public qrcode: QRCode;
-    public stream: MediaStream | null;
+    @Input() chooseCamera: Subject<MediaDeviceInfo> = new Subject();
+
+    private chooseCamera$: Subscription;
+
     public gCtx: CanvasRenderingContext2D;
     public videoElement: HTMLVideoElement;
-    public stopTimeout: any;
-    private hideCanvas: boolean = true;
+    public qrCode: QRCode;
+    public stream: MediaStream | null;
+    public captureTimeout: any;
+    private canvasHidden = true;
+    get isCanvasSupported(): boolean {
+        const canvas = this.renderer.createElement('canvas');
+        return !!(canvas.getContext && canvas.getContext('2d'));
+    }
 
-
-    constructor(public renderer: Renderer2) {
-
+    constructor(private renderer: Renderer2) {
     }
 
     ngOnInit() {
-
-    }
-
-    ngAfterViewInit() {
-        if(this.isCanvasSupported) {
-            if(this.debug) console.debug('The canvas is supprted on your browser');
-            this.gCtx = this.canvasRef.nativeElement.getContext('2d');
-            this.gCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-            this.qrcode = new QRCode();
-            if(this.debug) this.qrcode.debug = true;
-            this.qrcode.myCallback = (decoded: string) => { this.QrCodeCallback(decoded); };
-            this.initCameraComponents();
-        }
     }
 
     ngOnDestroy() {
-        
+        this.chooseCamera$.unsubscribe();
+        this.stopScanning();
     }
 
-    initCameraComponents() {
-        const browser = <any>navigator,
-        constraints: MediaStreamConstraints = {
-            audio: false,
-            video: true
-        };
-
-        if(this.stopTimeout) {
-            this.stopScanning();
+    ngAfterViewInit() {
+        if (this.debug) console.log('[QrScanner] ViewInit, isSupported: ', this.isCanvasSupported);
+        if (this.isCanvasSupported) {
+            this.gCtx = this.qrCanvas.nativeElement.getContext('2d');
+            this.gCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            this.qrCode = new QRCode();
+            if (this.debug) this.qrCode.debug = true;
+            this.qrCode.myCallback = (decoded: string) => this.QrDecodeCallback(decoded);
         }
-
-        if(!this.videoElement) {
-            this.videoElement = this.renderer.createElement('video');
-            this.videoElement.setAttribute('autoplay', 'true');
-            this.videoElement.setAttribute('muted', 'true');
-            this.renderer.appendChild(this.videoRef.nativeElement, this.videoElement);
-        }
-
-        browser.getUserMedia = (browser.getUserMedia || 
-            browser.webkitGetUserMedia || 
-            browser.mozGetUserMedia || 
-            browser.msGetUserMedia);
-        browser.mediaDevices.getUserMedia(constraints)
-        .then((stream: MediaStream) => {
-            this.setStream(stream);
-        })
-        .catch((err: any) => {
-            console.error(err);
-            this.isCanvasSupported = false;
+        this.chooseCamera$ = this.chooseCamera.asObservable().subscribe((camera: MediaDeviceInfo) => this.useDevice(camera));
+        this.getMediaDevices().then(devices => {
+            if (devices) {
+                const videoDevice = devices.find((dvc: MediaDeviceInfo) => {
+                    return dvc.kind === 'videoinput' && dvc.label.search(/back/i) > -1
+                });
+                this.chooseCamera.next(videoDevice);
+            }
         });
     }
 
-    QrCodeCallback(decodedData: string) {
-        if(this.stopAfterScan) {
-            this.onCapture.next(decodedData);
-            this.stopScanning();
-        } else {
-            this.onCapture.next(decodedData);
-            this.stopTimeout = setTimeout(() => this.captureCanvas(), this.updateTime);
-        }
-    }
-
-    setStream(stream: MediaStream) {
-        this.hideCanvas = true;
-        this.gCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-        this.stream = stream;
-        if(this.videoElement) this.videoElement.srcObject = stream;
-        this.stopTimeout = setTimeout(() => this.captureCanvas(), this.updateTime);
-    }
-
-    captureCanvas() {
-        try {
-            this.gCtx.drawImage(this.videoElement, this.canvasWidth, this.canvasHeight);
-            this.qrcode.decode(this.canvasRef.nativeElement);
-        } catch(e) {
-            this.debug && console.error(e);
-            this.stopTimeout = setTimeout(() => this.captureCanvas(), this.updateTime);
-        }
+    startScanning(device: MediaDeviceInfo) {
+        this.useDevice(device);
     }
 
     stopScanning() {
-        if(this.stopTimeout) {
-            clearTimeout(this.stopTimeout);
-            this.stopTimeout = 0;
+        if (this.captureTimeout) {
+            clearTimeout(this.captureTimeout);
+            this.captureTimeout = 0;
         }
-        this.hideCanvas = false;
-        if(this.stream && this.stream.getTracks().length) {
-            this.stream.getTracks().forEach((device) => {
-                device && device.enabled && device.stop();
-            });
+        this.canvasHidden = true;
+        const stream = this.stream && this.stream.getTracks().length && this.stream;
+        if (stream) {
+            stream.getTracks().forEach(track => track.enabled && track.stop())
             this.stream = null;
         }
     }
 
+    getMediaDevices(): Promise<MediaDeviceInfo[]> {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return Promise.resolve([]);
+        return navigator.mediaDevices.enumerateDevices()
+            .then((devices: MediaDeviceInfo[]) => devices)
+            .catch((error: any): any[] => {
+                if (this.debug) console.warn('Error', error);
+                return [];
+            });
+    }
+
+    public QrDecodeCallback(decoded: string) {
+        if (this.stopAfterScan) {
+            this.stopScanning();
+            this.onCapture.next(decoded);
+        } else {
+            this.onCapture.next(decoded);
+            this.captureTimeout = setTimeout(() => this.captureToCanvas(), this.updateTime);
+        }
+    }
+
+    private captureToCanvas() {
+        try {
+            this.gCtx.drawImage(this.videoElement, 0, 0, this.canvasWidth, this.canvasHeight);
+            this.qrCode.decode(this.qrCanvas.nativeElement);
+        } catch (e) {
+            if (this.debug) console.log('[QrScanner] Thrown', e);
+            if (!this.stream) return;
+            this.captureTimeout = setTimeout(() => this.captureToCanvas(), this.updateTime);
+        }
+    }
+
+    private setStream(stream: any) {
+        this.canvasHidden = true;
+        this.gCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        this.stream = stream;
+        this.videoElement.srcObject = stream;
+        this.captureTimeout = setTimeout(() => this.captureToCanvas(), this.updateTime);
+    }
+
+    private useDevice(_device: MediaDeviceInfo) {
+        const _navigator: any = navigator;
+
+        if (this.captureTimeout) {
+            this.stopScanning();
+        }
+
+        if (!this.videoElement) {
+            this.videoElement = this.renderer.createElement('video');
+            this.videoElement.setAttribute('autoplay', 'true');
+            this.videoElement.setAttribute('muted', 'true');
+            this.renderer.appendChild(this.videoWrapper.nativeElement, this.videoElement);
+        }
+        const self = this;
+        let constraints: MediaStreamConstraints;
+        if (_device) {
+            constraints = { audio: false, video: { deviceId: _device.deviceId } };
+        } else {
+            constraints = { audio: false, video: true };
+        }
+        _navigator.mediaDevices.getUserMedia(constraints).then(function (stream: MediaStream) {
+            self.setStream(stream);
+        }).catch(function (err: any) {
+            return self.debug && console.warn('Error', err);
+        });
+    }
 }
