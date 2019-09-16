@@ -58,7 +58,7 @@ Then inside your component template,
         [stopAfterScan]="true"
         [updateTime]="500"
         (onCapture)="captureImage($event)"
-        [scanQrCode]="true>
+        [scanQrCode]="true">
     </qr-code-all>
 </div>
 ```
