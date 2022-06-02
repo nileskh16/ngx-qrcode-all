@@ -11,7 +11,7 @@
         "@angular/common": "^6.1.7",
         "@angular/compiler": "^6.1.7",
         "@angular/compiler-cli": "^6.1.7",
-        "@angular/core": "^6.1.7",
+        "@angular/core": "^11.0.5",
         "rollup": "^0.65.2",
         "rxjs": "^6.3.3",
         "typescript": "^3.0.3",
